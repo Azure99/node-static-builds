@@ -1,0 +1,6 @@
+binutils
+fortify-headers
+g++
+linux-headers
+make
+python3

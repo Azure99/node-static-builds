@@ -1,0 +1,19 @@
+{
+  "name": "node-static-builds",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=22.23.3"
+  },
+  "scripts": {
+    "lint": "eslint scripts eslint.config.mjs && shellcheck scripts/build-node.sh",
+    "format": "prettier --write .",
+    "format:check": "prettier --check ."
+  },
+  "devDependencies": {
+    "@eslint/js": "10.0.1",
+    "eslint": "10.10.0",
+    "globals": "16.5.0",
+    "prettier": "3.6.2"
+  }
+}

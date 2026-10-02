@@ -1,0 +1,13 @@
+{
+  "node": {
+    "version": "22.23.3",
+    "url": "https://nodejs.org/dist/v22.23.3/node-v22.23.3.tar.xz",
+    "sha256": "bd97093e1a1e9243338950c174a693a64d4e0926a9c6ce259962bc58d5e96909"
+  },
+  "recipeRevision": 1,
+  "alpine": "alpine:3.23@sha256:85fe1e81d6758c208f3e1eed4338a1997e19d4be002d4dd32d3100c9a8c010a0",
+  "muslCopyright": {
+    "url": "https://git.musl-libc.org/cgit/musl/plain/COPYRIGHT?h=v1.2.5",
+    "sha256": "f9bc4423732350eb0b3f7ed7e91d530298476f8fec0c6c427a1c04ade22655af"
+  }
+}

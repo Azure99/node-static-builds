@@ -1,0 +1,114 @@
+name: Build and release
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: node-static-release
+  cancel-in-progress: false
+
+defaults:
+  run:
+    shell: bash
+
+jobs:
+  preflight:
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    # Draft releases are visible to callers with repository push access.
+    permissions:
+      contents: write
+    outputs:
+      build: ${{ steps.release.outputs.build }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "22.23.3"
+          package-manager-cache: false
+      - run: npm ci --ignore-scripts --no-audit --no-fund
+      - run: npm run lint
+      - run: npm run format:check
+      - id: release
+        run: node scripts/release.mjs preflight
+        env:
+          GH_TOKEN: ${{ github.token }}
+
+  build:
+    needs: preflight
+    if: needs.preflight.outputs.build == 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - architecture: amd64
+            runner: ubuntu-24.04
+          - architecture: arm64
+            runner: ubuntu-24.04-arm
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 240
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "22.23.3"
+          package-manager-cache: false
+      - name: Build and validate the archive
+        run: |
+          uname -a
+          df -h /var/tmp
+          free -m
+          node scripts/build.mjs "$ARCHITECTURE" /var/tmp/node-static-output
+        env:
+          ARCHITECTURE: ${{ matrix.architecture }}
+      - name: Check artifact size
+        run: |
+          bytes=$(du -sb /var/tmp/node-static-output | cut -f1)
+          if (( bytes > 268435456 )); then
+            echo 'Component output exceeds the 256 MiB artifact limit' >&2
+            exit 1
+          fi
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: node-static-${{ matrix.architecture }}
+          path: |
+            /var/tmp/node-static-output/*.tar.gz
+            /var/tmp/node-static-output/*.json
+          if-no-files-found: error
+          compression-level: 0
+          retention-days: 1
+
+  publish:
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "22.23.3"
+          package-manager-cache: false
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          pattern: node-static-*
+          path: /var/tmp/node-static-output
+          merge-multiple: true
+      - name: Check transferred artifacts and publish
+        run: node scripts/release.mjs publish /var/tmp/node-static-output
+        env:
+          GH_TOKEN: ${{ github.token }}
